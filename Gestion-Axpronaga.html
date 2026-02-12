@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<div id="login-screen" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 1000; display: flex; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 30px; border-radius: 16px; width: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center;">
+        <h2 style="margin-bottom: 20px; color: #0f172a;">🔐 Acceso Seguro</h2>
+        <input type="email" id="email" placeholder="Email" style="width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box;">
+        <input type="password" id="password" placeholder="Contraseña" style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box;">
+        <button onclick="intentarLogin()" style="width: 100%; background: #6366f1; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Entrar al Sistema</button>
+        <p id="login-error" style="color: #ef4444; font-size: 12px; margin-top: 15px; display: none;">Credenciales incorrectas</p>
+    </div>
+</div>
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión Profesional 2026 - Control Cloud</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --cols-days: 31; }
+        body { background-color: #f1f5f9; font-family: sans-serif; margin: 0; padding: 10px; color: #334155; }
+        header { background: white; padding: 12px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); border-top: 5px solid #0f172a; flex-wrap: wrap; gap: 10px; }
+        
+        .grid-container { display: grid; grid-template-columns: 180px 80px repeat(var(--cols-days), 42px); width: max-content; }
+        .sticky-col { position: sticky; left: 0; z-index: 30; background: #f8fafc; border-right: 2px solid #cbd5e1; font-weight: bold; min-width: 180px; max-width: 180px; box-sizing: border-box; }
+        .sticky-col-2 { position: sticky; left: 180px; z-index: 20; background: white; border-right: 1px solid #e2e8f0; min-width: 80px; max-width: 80px; box-sizing: border-box; }
+        .is-hidden { display: none !important; }
+        
+        .empleado-header { cursor: pointer; border-bottom: 2px solid #cbd5e1; height: 50px; display: flex; flex-direction: column; justify-content: center; padding: 0 12px; line-height: 1.2; transition: background 0.2s; position: relative; grid-column: 1; }
+        .empleado-header:hover { background-color: #f1f5f9 !important; }
+        
+        .es-rotativo { border-left: 10px solid #f97316 !important; background-color: #fff7ed !important; }
+        .es-fijo { border-left: 10px solid #3b82f6 !important; background-color: #f0f9ff !important; }
+        .es-temporal { border-left: 10px solid #10b981 !important; background-color: #f0fdf4 !important; }
+        
+        .info-label-fixed { grid-column: 2; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: bold; color: #64748b; border-bottom: 2px solid #cbd5e1; background: white; }
+        .info-pane { grid-column: 3 / span var(--cols-days); background: #f8fafc; border-bottom: 2px solid #cbd5e1; display: flex; align-items: center; padding: 0 15px; font-size: 11px; color: #64748b; height: 50px; box-sizing: border-box; gap: 15px; }
+        
+.cell-input { width: 100%; height: 100%; font-size: 10px; cursor: pointer; border: none; background: transparent; font-weight: bold; text-align: center; outline: none; color: inherit; appearance: none; }
+
+        /* --- COLORES --- */
+        .c-TM { background-color: #ffdbb6 !important; color: #334155; }
+        .c-TT { background-color: #d62e4e !important; color: white; }
+        .c-TN { background-color: #df5327 !important; color: white; }
+        .c-SUS { background-color: #7030a0 !important; color: white; }
+        .c-BAJAM { background-color: #ff0000 !important; color: white; }
+        .c-BAJAIT { background-color: #ff5050 !important; color: white; }
+        .c-VAC { background-color: #00b0f0 !important; color: white; }
+        .c-AP { background-color: #e2f0d9 !important; color: #334155; }
+        .c-HSIND { background-color: #c5e0b4 !important; color: #334155; }
+        .c-EXC { background-color: #ff0066 !important; color: white; }
+        .c-EX { background-color: #a6b727 !important; color: white; }
+        .c-MED { background-color: #000000 !important; color: white; }
+        .c-FINFEST { background-color: #ffff00 !important; color: #334155; }
+        .c-vacío { background-color: white; color: #334155; }
+        .sabado-domingo { background-color: #e2e8f0 !important; color: #334155 !important; }
+
+        .btn { padding: 8px 12px; border-radius: 8px; border: none; color: white; font-weight: bold; cursor: pointer; font-size: 10px; text-transform: uppercase; }
+        .btn-save { background: #059669; }
+        .btn-config { background: #6366f1; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap: 5px; margin-bottom: 10px; }
+        .stat-card { padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; }
+        
+        #modalConfig, #modalReport { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 100; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 95%; max-width: 1250px; max-height: 85vh; overflow-y: auto; }
+        .emp-item { display: flex; gap: 5px; margin-bottom: 8px; align-items: center; background: #f8fafc; padding: 8px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .emp-item input { padding: 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 11px; }
+
+        .report-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 15px; }
+        .report-table th, .report-table td { border: 1px solid #cbd5e1; padding: 6px; text-align: center; }
+        .report-table th { background: #0f172a; color: white; }
+        .report-controls { display: flex; gap: 8px; margin: 15px 0; background: #f1f5f9; padding: 10px; border-radius: 8px; flex-wrap: wrap; align-items: center; }
+
+        @media print {
+            header, .btn, .stats-grid, #modalConfig, .no-print, .report-controls { display: none !important; }
+            body { background: white; }
+            #modalReport { position: absolute; display: block; background: white; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1 style="margin:0; font-size: 16px;">📋 GESTIÓN SERVICIOS 2026</h1>
+            <select id="selectorMes" onchange="generarCuadrante()" style="margin-top:5px; padding: 3px; font-weight: bold; color: black;">
+                <option value="0">ENERO</option><option value="1" selected>FEBRERO</option>
+                <option value="2">MARZO</option><option value="3">ABRIL</option>
+                <option value="4">MAYO</option><option value="5">JUNIO</option>
+                <option value="6">JULIO</option><option value="7">AGOSTO</option>
+                <option value="8">SEPTIEMBRE</option><option value="9">OCTUBRE</option>
+                <option value="10">NOVIEMBRE</option><option value="11">DICIEMBRE</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span id="syncStatus" style="font-size: 10px; font-weight:bold; color:#64748b">INICIALIZANDO...</span>
+            <button onclick="abrirModalInforme()" class="btn" style="background:#8b5cf6">📊 Informes</button>
+            <button onclick="abrirModal()" class="btn btn-config">⚙️ Plantilla</button>
+            <button onclick="guardarTodo()" class="btn btn-save">💾 Guardar DB</button>
+            <button onclick="cerrarSesion()" class="btn" style="background:#475569; border: 1px solid #334155;">🚪 Salir</button>
+        </div>
+    </header>
+
+    <div id="stats" class="stats-grid"></div>
+
+    <div style="background: white; border-radius: 12px; border: 1px solid #cbd5e1; overflow-x: auto;">
+        <div id="cuadrante" class="grid-container"></div>
+    </div>
+
+    <div id="modalConfig">
+        <div class="modal-content">
+            <h3 style="margin-top:0">Configurar Plantilla (Clave DNI)</h3>
+            <div id="listaEmpleados"></div>
+            <button onclick="añadirFilaEmpleado()" style="width:100%; padding:10px; margin-top:10px; cursor:pointer; font-weight:bold">+ Añadir Nuevo Empleado</button>
+            <div style="margin-top:20px; display:flex; justify-content: flex-end; gap:10px;">
+                <button onclick="cerrarModal()" class="btn" style="background:#94a3b8">Cerrar</button>
+                <button onclick="guardarPlantilla()" class="btn" style="background:#6366f1">Sincronizar Plantilla</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalReport">
+        <div class="modal-content">
+            <div style="display:flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px;">
+                <h2 id="reportTitle" style="margin:0">Informes de Gestión</h2>
+                <div class="no-print">
+                    <button onclick="exportarExcel()" class="btn" style="background:#15803d">Excel (.csv)</button>
+                    <button onclick="window.print()" class="btn" style="background:#059669">PDF</button>
+                    <button onclick="cerrarModalReport()" class="btn" style="background:#ef4444">Cerrar</button>
+                </div>
+            </div>
+            <div class="report-controls no-print">
+                <button onclick="generarInforme('total')" class="btn" style="background:#475569">General</button>
+                <button onclick="generarInforme('rotativo')" class="btn" style="background:#f97316">Rotativos</button>
+                <button onclick="generarInforme('fijo')" class="btn" style="background:#3b82f6">Fijos</button>
+                <button onclick="generarInforme('temporal')" class="btn" style="background:#10b981">Temporales</button>
+                <div style="border-left: 2px solid #cbd5e1; height: 20px; margin: 0 5px;"></div>
+                <button onclick="generarInformeAnual()" class="btn" style="background:#0f172a">📊 Resumen Anual</button>
+                <select id="selectEmpInforme" onchange="generarInforme('individual')" style="padding:5px; border-radius:5px; font-weight:bold; margin-left: auto; color: black;"></select>
+            </div>
+            <div id="reportContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://kxatbvlglazcvtyfalyo.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_MUbi5k1R9waWYNvKdBkOFA_b19UJAg5';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let personal = [];
+        let datosCuadranteActual = {};
+        let filtroActivo = null;
+        let expandidoTodo = false;
+        const turnos = ["MAÑANA", "TARDE", "NOCHE"];
+        const opciones = ["-", "TM", "TT", "TN", "SUS", "BAJA M", "BAJA IT", "VAC", "AP", "H.SIND", "EXC", "EX", "MED", "FIN/FEST"];
+        const mapaClases = { "TM": "c-TM", "TT": "c-TT", "TN": "c-TN", "SUS": "c-SUS", "BAJA M": "c-BAJAM", "BAJA IT": "c-BAJAIT", "VAC": "c-VAC", "AP": "c-AP", "H.SIND": "c-HSIND", "EXC": "c-EXC", "EX": "c-EX", "MED": "c-MED", "FIN/FEST": "c-FINFEST", "-": "c-vacío" };
+
+        // Al cargar la página, verificamos si ya hay una sesión activa
+        async function inicializarSeguridad() {
+            const { data: { session } } = await _supabase.auth.getSession();
+            
+            if (session) {
+                document.getElementById('login-screen').style.display = 'none';
+                inicializar(); // Carga la app si ya estás logueado
+            } else {
+                document.getElementById('login-screen').style.display = 'flex';
+            }
+        }
+
+        // Función para entrar
+        async function intentarLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('login-error');
+            const btn = event.target;
+
+            btn.innerText = "⌛ Verificando...";
+            btn.disabled = true;
+
+            const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                errorMsg.innerText = "❌ Acceso denegado: " + error.message;
+                errorMsg.style.display = 'block';
+                btn.innerText = "Entrar al Sistema";
+                btn.disabled = false;
+            } else {
+                location.reload(); // Recargamos para que inicializarSeguridad haga su magia
+            }
+        }
+
+        // Función para salir
+        async function cerrarSesion() {
+            if(confirm("¿Estás seguro de que quieres cerrar la sesión?")) {
+                await _supabase.auth.signOut();
+                location.reload();
+            }
+        }
+
+        async function inicializar() {
+            try {
+                const { data, error } = await _supabase
+                    .from('empleados')
+                    .select('*')
+                    .eq('activo', true)
+                    .order('nombre');
+
+                if (error) throw error;
+                personal = data.map(e => ({
+                    dni: e.dni,
+                    nombre: e.nombre, sala: e.sala, jornada: e.jornada,
+                    rotativo: e.es_rotativo, temporal: e.es_temporal, info: e.info_adicional
+                }));
+                document.getElementById('syncStatus').innerText = "☁️ CONECTADO";
+                generarCuadrante();
+            } catch (e) { document.getElementById('syncStatus').innerText = "⚠️ ERROR DB"; }
+        }
+
+        async function generarCuadrante(tipoFiltro = null) {
+            filtroActivo = tipoFiltro;
+            const mesIdx = parseInt(document.getElementById('selectorMes').value);
+            const diasMes = new Date(2026, mesIdx + 1, 0).getDate();
+            document.documentElement.style.setProperty('--cols-days', diasMes);
+
+            const { data } = await _supabase.from('cuadrantes_mensuales').select('datos').eq('mes_id', mesIdx).single();
+            datosCuadranteActual = data ? data.datos : {};
+
+            const container = document.getElementById('cuadrante');
+            const diasSemanaTxt = ["DOM", "LUN", "MAR", "MIÉ", "JUE", "VIE", "SÁB"];
+
+            let html = `<div onclick="toggleMaestroEmpleado()" class="sticky-col" style="background:#0f172a; color:white; padding:10px; text-align:center; font-size:10px; cursor:pointer">EMPLEADO (↕)</div>
+                        <div onclick="toggleSoloTurnos()" class="sticky-col-2" style="background:#0f172a; color:white; padding:10px; text-align:center; font-size:10px; cursor:pointer">TURNO (↕)</div>`;
+            
+            for (let d = 1; d <= diasMes; d++) {
+                const f = new Date(2026, mesIdx, d);
+                const esF = (f.getDay() === 0 || f.getDay() === 6);
+                html += `<div style="background:${esF ? '#334155' : '#0f172a'}; color:white; text-align:center; padding:5px; border-right:1px solid #1e293b">
+                            <div style="font-size:13px; font-weight:bold">${d}</div>
+                            <div style="font-size:8px; font-weight: bold; opacity: 0.7;">${diasSemanaTxt[f.getDay()]}</div>
+                        </div>`;
+            }
+
+            personal.forEach((emp, index) => {
+                if (filtroActivo) {
+                    if (filtroActivo === 'rotativo' && !emp.rotativo) return;
+                    if (filtroActivo === 'temporal' && !emp.temporal) return;
+                    if (filtroActivo === 'fijo' && (emp.rotativo || emp.temporal)) return;
+                }
+
+
+            const empId = `u-${index}`;
+            let tipoClase = emp.rotativo ? 'es-rotativo' : (emp.temporal ? 'es-temporal' : 'es-fijo');
+            let strTipo = emp.rotativo ? 'rotativo' : (emp.temporal ? 'temporal' : 'fijo');
+
+            html += `
+                <div onclick="clickEnFila(event, '${empId}', '${strTipo}')" class="empleado-header sticky-col ${tipoClase}">
+                    <span style="font-size:10px; font-weight:bold">▶ ${emp.nombre}</span>
+                    <div style="font-size:8px; opacity:0.8; margin-top:3px;">🆔 ${emp.dni} | 📊 ${emp.jornada}</div>
+                </div>
+                
+                <div class="info-label-fixed sticky-col-2" style="flex-direction: column; line-height: 1.1;">
+                    <span style="border-bottom: 1px solid #e2e8f0; width: 100%; text-align: center; padding-bottom: 2px; margin-bottom: 2px;">INFO:</span>
+                    <span style="color: #0f172a; font-size: 9px;">${emp.sala}</span>
+                </div>
+                
+                <div class="info-pane"> 
+                    <span>${emp.info || ''}</span> 
+                </div>`;
+
+                turnos.forEach(t => {
+                    const rClass = `r-data-${empId} row-master`;
+                    html += `<div class="${rClass} is-hidden sticky-col" style="border-bottom:1px solid #e2e8f0; height:30px"></div>
+                             <div class="${rClass} is-hidden sticky-col-2" style="border-bottom:1px solid #e2e8f0; font-size:9px; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#94a3b8">${t}</div>`;
+                    for (let d = 1; d <= diasMes; d++) {
+                        const k = `${emp.nombre}-${t}-${d}`;
+                        const v = datosCuadranteActual[k] || "-";
+                        const f = new Date(2026, mesIdx, d);
+                        const esF = (f.getDay() === 0 || f.getDay() === 6);
+                        html += `<div class="${rClass} is-hidden ${mapaClases[v] || "c-vacío"} ${esF && v === '-' ? 'sabado-domingo' : ''}" style="border-bottom:1px solid #e2e8f0; border-right:1px solid #e2e8f0">
+                                    <select data-key="${k}" class="cell-input" onchange="updateStyle(this, ${esF})">
+                                        ${opciones.map(o => `<option value="${o}" ${o === v ? 'selected' : ''}>${o}</option>`).join('')}
+                                    </select>
+                                 </div>`;
+                    }
+                });
+            });
+            container.innerHTML = html;
+            actualizarResumen();
+        }
+
+        function clickEnFila(e, empId, tipo) {
+            if (e.offsetX <= 15) { generarCuadrante(tipo); } 
+            else { toggleRows(empId); } 
+        }
+
+        function toggleMaestroEmpleado() {
+            if (filtroActivo) { 
+                expandidoTodo = false;
+                generarCuadrante(null);
+            } else { 
+                expandidoTodo = !expandidoTodo;
+                document.querySelectorAll('.row-master').forEach(el => {
+                    if (expandidoTodo) el.classList.remove('is-hidden'); else el.classList.add('is-hidden');
+                });
+                actualizarResumen();
+            }
+        }
+
+        function toggleSoloTurnos() {
+            const rows = document.querySelectorAll('.row-master');
+            const algunVisible = Array.from(rows).some(r => !r.classList.contains('is-hidden'));
+            rows.forEach(r => algunVisible ? r.classList.add('is-hidden') : r.classList.remove('is-hidden'));
+            expandidoTodo = !algunVisible;
+            actualizarResumen();
+        }
+
+        function toggleRows(id) { document.querySelectorAll(`.r-data-${id}`).forEach(el => el.classList.toggle('is-hidden')); actualizarResumen(); }
+
+        function abrirModalInforme() {
+            const select = document.getElementById('selectEmpInforme');
+            select.innerHTML = '<option value="">-- Ver Individual --</option>';
+            personal.forEach(emp => {
+                const opt = document.createElement('option');
+                opt.value = emp.nombre; opt.textContent = emp.nombre; select.appendChild(opt);
+            });
+            document.getElementById('modalReport').style.display = 'flex';
+            generarInforme('total');
+        }
+
+        async function generarInforme(tipo) {
+            const mesIdx = document.getElementById('selectorMes').value;
+            const mesNombre = document.getElementById('selectorMes').options[mesIdx].text;
+            const empSel = document.getElementById('selectEmpInforme').value;
+            const storage = {};
+            document.querySelectorAll('.cell-input').forEach(i => { if (i.value !== "-") storage[i.dataset.key] = i.value; });
+            let filtrados = personal;
+            if (tipo === 'rotativo') filtrados = personal.filter(e => e.rotativo);
+            else if (tipo === 'fijo') filtrados = personal.filter(e => !e.rotativo && !e.temporal);
+            else if (tipo === 'temporal') filtrados = personal.filter(e => e.temporal);
+            else if (tipo === 'individual' && empSel) filtrados = personal.filter(e => e.nombre === empSel);
+            document.getElementById('reportTitle').innerText = `${mesNombre} 2026 - ${tipo.toUpperCase()}`;
+            renderTablaInforme(filtrados, [storage]);
+        }
+
+        async function generarInformeAnual() {
+            const empSel = document.getElementById('selectEmpInforme').value;
+            let filtrados = personal;
+            if (empSel) filtrados = personal.filter(e => e.nombre === empSel);
+            document.getElementById('reportTitle').innerText = empSel ? `ANUAL: ${empSel}` : "RESUMEN ANUAL 2026";
+            const { data } = await _supabase.from('cuadrantes_mensuales').select('datos');
+            const storages = data ? data.map(d => d.datos) : [];
+            renderTablaInforme(filtrados, storages);
+        }
+
+        // MODIFICACIÓN: Tabla de informes ahora incluye DNI y Sala
+        function renderTablaInforme(empleados, storages) {
+            let html = `<table id="tablaRep" class="report-table">
+                <thead>
+                    <tr>
+                        <th>DNI</th>
+                        <th>Empleado</th>
+                        <th>Sala</th>
+                        <th>Tipo</th>
+                        ${opciones.filter(o => o !== "-").map(o => `<th>${o}</th>`).join('')}
+                        <th>TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            empleados.forEach(emp => {
+                let total = 0; let c = {}; opciones.forEach(o => c[o] = 0);
+                storages.forEach(s => {
+                    Object.keys(s).forEach(k => { 
+                        if (k.startsWith(`${emp.nombre}-`)) { 
+                            const v = s[k]; 
+                            if (c.hasOwnProperty(v)) { 
+                                c[v]++; 
+                                if (v !== "-" && v !== "FIN/FEST") total++; 
+                            } 
+                        } 
+                    });
+                });
+                html += `<tr>
+                    <td style="font-weight:bold">${emp.dni}</td>
+                    <td>${emp.nombre}</td>
+                    <td>${emp.sala}</td>
+                    <td>${emp.rotativo?'ROT':emp.temporal?'TEMP':'FIJO'}</td>
+                    ${opciones.filter(o => o !== "-").map(o => `<td>${c[o]}</td>`).join('')}
+                    <td style="background:#f1f5f9; font-weight:bold">${total}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('reportContainer').innerHTML = html;
+        }
+
+        function exportarExcel() {
+            const tabla = document.getElementById('tablaRep');
+            let csv = [];
+            tabla.querySelectorAll("tr").forEach(tr => { csv.push(Array.from(tr.querySelectorAll("th, td")).map(c => `"${c.innerText}"`).join(",")); });
+            const blob = new Blob(["\ufeff" + csv.join("\n")], { type: 'text/csv' });
+            const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "informe_2026.csv"; link.click();
+        }
+
+        function actualizarResumen() {
+            const visibles = [];
+            personal.forEach((e, i) => { 
+                const el = document.querySelector(`.r-data-u-${i}`);
+                if (el && !el.classList.contains('is-hidden')) visibles.push(e.nombre); 
+            });
+            const r = {}; opciones.forEach(o => r[o] = 0);
+            const filtro = visibles.length === 1 ? visibles[0] : null;
+            document.querySelectorAll('.cell-input').forEach(i => {
+                if (!filtro || i.dataset.key.startsWith(`${filtro}-`)) { if (r.hasOwnProperty(i.value)) r[i.value]++; }
+            });
+            let h = '';
+            opciones.forEach(o => { if (o !== "-") h += `<div class="stat-card ${mapaClases[o]}"><span>${o}:</span><b>${r[o]}</b></div>`; });
+            document.getElementById('stats').innerHTML = h;
+        }
+
+        async function guardarTodo() {
+            const mesIdx = parseInt(document.getElementById('selectorMes').value);
+            const status = document.getElementById('syncStatus');
+            status.innerText = "⏳ GUARDANDO...";
+            const s = {};
+            document.querySelectorAll('.cell-input').forEach(i => { if (i.value !== "-") s[i.dataset.key] = i.value; });
+            await _supabase.from('cuadrantes_mensuales').upsert({ mes_id: mesIdx, datos: s, ultima_modificacion: new Date() });
+            status.innerText = "✅ GUARDADO";
+            setTimeout(() => status.innerText = "☁️ CONECTADO", 2000);
+        }
+
+        function updateStyle(s, f) {
+            const v = s.value; const p = s.parentElement;
+            p.className = p.className.split(' ').filter(c => !c.startsWith('c-') && c !== 'sabado-domingo').join(' ');
+            p.classList.add(mapaClases[v] || 'c-vacío');
+            if (f && v === '-') p.classList.add('sabado-domingo');
+            actualizarResumen();
+        }
+
+        function cerrarModal() { document.getElementById('modalConfig').style.display = 'none'; }
+        function cerrarModalReport() { document.getElementById('modalReport').style.display = 'none'; }
+        window.onload = inicializarSeguridad;
+
+        function abrirModal() {
+            const lista = document.getElementById('listaEmpleados'); lista.innerHTML = '';
+            personal.forEach(e => añadirFilaEmpleado(e));
+            document.getElementById('modalConfig').style.display = 'flex';
+        }
+
+        function añadirFilaEmpleado(d = {dni:'', nombre:'', sala:'', jornada:'100%', rotativo:false, temporal:false, info:''}) {
+            const div = document.createElement('div');
+            div.className = 'emp-item';
+            div.innerHTML = `
+                <input type="text" placeholder="DNI" value="${d.dni}" style="width:90px; font-weight:bold" maxlength="9"> 
+                <input type="text" placeholder="NOMBRE" value="${d.nombre}" style="width:130px"> 
+                <input type="text" placeholder="SALA" value="${d.sala}" style="width:60px"> 
+                <input type="text" placeholder="JOR" value="${d.jornada}" style="width:40px"> 
+                <label><input type="checkbox" ${d.rotativo?'checked':''}> R</label> 
+                <label><input type="checkbox" ${d.temporal?'checked':''}> T</label> 
+                <input type="text" placeholder="INFORMACIÓN ADICIONAL" value="${d.info||''}" style="flex-grow:1"> 
+                <button onclick="this.parentElement.remove()" style="background:#fee2e2; border:1px solid #ef4444; color:#ef4444; border-radius:4px; cursor:pointer">✖</button>`;
+            document.getElementById('listaEmpleados').appendChild(div);
+        }
+
+        async function guardarPlantilla() {
+            const status = document.getElementById('syncStatus');
+            const filasEditor = Array.from(document.querySelectorAll('.emp-item'));
+            
+            // 1. Recoger datos y detectar errores
+            let hayError = false;
+            const datosEditor = filasEditor.map((f, index) => {
+                const dni = f.querySelectorAll('input[type="text"]')[0].value.toUpperCase().trim();
+                const nombre = f.querySelectorAll('input[type="text"]')[1].value.toUpperCase().trim();
+                const sala = f.querySelectorAll('input[type="text"]')[2].value.toUpperCase().trim();
+                const jornada = f.querySelectorAll('input[type="text"]')[3].value.trim();
+                const rotativo = f.querySelectorAll('input[type="checkbox"]')[0].checked;
+                const temporal = f.querySelectorAll('input[type="checkbox"]')[1].checked;
+                const info = f.querySelectorAll('input[type="text"]')[4].value.trim();
+
+                // Validación: Si falta DNI o Nombre en una fila que no está vacía
+                if (!dni || !nombre) {
+                    hayError = true;
+                    f.style.border = "2px solid #ef4444"; // Resaltamos la fila con error
+                } else {
+                    f.style.border = "1px solid #e2e8f0"; // Restauramos borde si está ok
+                }
+
+                return {
+                    dni, nombre, sala, jornada,
+                    es_rotativo: rotativo,
+                    es_temporal: temporal,
+                    info_adicional: info,
+                    activo: true
+                };
+            });
+
+            // 2. Si hay error, mostrar mensaje y abortar
+            if (hayError) {
+                alert("⚠️ Error: El DNI y el NOMBRE son campos obligatorios para todos los empleados.");
+                return; 
+            }
+
+            // 3. Proceder con el guardado si todo está bien
+            status.innerText = "⏳ ACTUALIZANDO PLANTILLA...";
+            const dnisEnEditor = datosEditor.map(e => e.dni);
+
+            try {
+                // Desactivar empleados que ya no están en la lista
+                if (dnisEnEditor.length > 0) {
+                    await _supabase
+                        .from('empleados')
+                        .update({ activo: false })
+                        .not('dni', 'in', `(${dnisEnEditor.map(d => `'${d}'`).join(',')})`);
+                } else {
+                    await _supabase.from('empleados').update({ activo: false }).neq('dni', '0');
+                }
+
+                // Upsert de los datos validados
+                if (datosEditor.length > 0) {
+                    const { error } = await _supabase.from('empleados').upsert(datosEditor, { onConflict: 'dni' });
+                    if (error) throw error;
+                }
+
+                status.innerText = "✅ PLANTILLA SINCRONIZADA";
+                cerrarModal(); 
+                inicializar(); 
+            } catch (err) {
+                console.error(err);
+                status.innerText = "❌ ERROR DE CONEXIÓN";
+                alert("Hubo un error al sincronizar con la base de datos.");
+            }
+        }
+    </script>
+</body>
+</html>
